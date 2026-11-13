@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2e7d32">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>長興出貨單</title>
+<style>
+:root{--g:#2e7d32;--g2:#e7f3e8;--ln:#06c755;--bg:#f7f5ef;--tx:#1a1a1a;--mu:#666;--rd:#c62828;--bd:#d9d4c7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);
+  font-family:"Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  font-size:22px;line-height:1.35;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;overscroll-behavior:none}
+input{font:inherit;-webkit-user-select:text;user-select:text}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+.screen{display:none;flex-direction:column;height:100vh;height:100dvh;max-width:560px;margin:0 auto;background:var(--bg)}
+.screen.active{display:flex}
+
+/* 共用頂端與按鈕 */
+.top{position:relative;background:var(--g);color:#fff;text-align:center;padding:12px 12px 12px;padding-top:calc(12px + env(safe-area-inset-top))}
+.top .title{font-size:30px;font-weight:700;letter-spacing:2px}
+.top .gear{position:absolute;right:8px;top:calc(8px + env(safe-area-inset-top));font-size:15px;color:#d9eeda;padding:6px 8px}
+.date-btn{margin-top:6px;font-size:22px;white-space:nowrap;background:rgba(255,255,255,.18);border-radius:12px;padding:6px 12px;color:#fff}
+.date-btn .pen{display:inline-block;font-size:16px;background:#fff;color:var(--g);border-radius:8px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.bar{background:var(--g);color:#fff;font-size:26px;font-weight:700;text-align:center;padding:12px;padding-top:calc(12px + env(safe-area-inset-top))}
+.btn{display:flex;align-items:center;justify-content:center;min-height:64px;border-radius:16px;font-size:24px;font-weight:700;padding:8px 12px;text-align:center}
+.btn.green{background:var(--g);color:#fff}
+.btn.line{background:var(--ln);color:#fff}
+.btn.gray{background:#e2ded4;color:#333}
+.btn.red{background:var(--rd);color:#fff}
+.btn.white{background:#fff;border:2px solid var(--bd)}
+.btn.wide{grid-column:1/-1}
+.btn:active,.row:active,.chip:active,.keypad button:active,.presets button:active,.tools button:active{filter:brightness(.88)}
+.bottom{display:grid;grid-template-columns:1fr 2fr;gap:10px;padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom));border-top:2px solid var(--bd);background:var(--bg)}
+.bottom.one{grid-template-columns:1fr}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px}
+
+/* 主畫面清單 */
+.list{flex:1;overflow-y:auto;padding:8px 10px;-webkit-overflow-scrolling:touch}
+.row{display:flex;align-items:center;width:100%;min-height:62px;background:#fff;border:2px solid var(--bd);border-radius:14px;margin:0 0 8px;padding:6px 12px;text-align:left;font-size:24px}
+.row .no{width:32px;color:var(--mu);font-size:20px;flex:none}
+.row .nm{flex:1;font-weight:700;word-break:break-all;line-height:1.2;padding-right:4px}
+.row .wt{width:88px;text-align:right;flex:none}
+.row .pr{width:88px;text-align:right;flex:none;font-weight:700}
+.row small{font-size:16px;font-weight:400;color:var(--mu);margin-left:2px}
+.row em{font-style:normal;color:#b0a890;font-size:18px;font-weight:400}
+.empty{text-align:center;color:var(--mu);padding:60px 10px;font-size:24px}
+.total{background:#fff8dc;border-top:2px solid var(--bd);padding:8px 14px;font-size:24px;text-align:center}
+.total b{font-size:30px;color:var(--rd)}
+.total .warn{font-size:18px;color:#a35b00}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+
+/* 修改畫面 */
+.fields{padding:8px 10px 0}
+.field{display:flex;align-items:center;background:#fff;border:3px solid var(--bd);border-radius:14px;min-height:62px;margin-bottom:8px;padding:4px 12px}
+.field.active{border-color:var(--g);box-shadow:0 0 0 3px rgba(46,125,50,.25)}
+.field .lab{width:60px;color:var(--mu);font-size:20px;flex:none}
+.field input{flex:1;border:0;outline:0;font-size:28px;font-weight:700;min-width:0;background:transparent;padding:6px 0;color:var(--tx)}
+.field input::placeholder{font-size:19px;font-weight:400;color:#aaa}
+.field .val{flex:1;font-size:30px;font-weight:700;text-align:right;padding:0 8px}
+.field .val.sel span{background:#cfe6d0;border-radius:6px;padding:0 4px}
+.field .val .ph{font-size:19px;font-weight:400;color:#aaa}
+.field .unit{font-size:22px;color:var(--mu);width:28px;flex:none}
+.hint{font-size:18px;color:#7a5b00;min-height:22px;padding:0 4px 4px}
+.tools{display:flex;gap:8px;padding:0 10px 8px}
+.tools button{flex:1;min-height:48px;border-radius:12px;background:#fff;border:2px solid var(--bd);font-size:19px}
+.tools .del{color:var(--rd);border-color:#e9b4b4;font-weight:700}
+.panel{flex:1;overflow-y:auto;padding:6px 10px 8px;border-top:2px dashed var(--bd);-webkit-overflow-scrolling:touch}
+.inbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 4px}
+.inbtns button{min-height:58px;border-radius:14px;font-size:22px;font-weight:700;background:#fff;border:2px solid var(--bd)}
+.inbtns .mic{background:#fff3e0;border-color:#ffb74d}
+.inbtns .mic.listening{background:#ff7043;color:#fff;border-color:#ff7043;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.7}}
+.sub{font-size:18px;color:var(--mu);margin:8px 2px 6px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chip{background:#fff;border:2px solid var(--bd);border-radius:12px;min-height:58px;font-size:21px;font-weight:700;padding:4px;line-height:1.15;word-break:break-all}
+.chip.on{background:#eef5ee;color:#5c7d5e}
+.chip small{display:block;font-size:13px;font-weight:400}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:2px 0 4px}
+.presets button{min-height:52px;border-radius:12px;background:#e7f0fb;border:2px solid #9bbbe0;font-size:22px;font-weight:700}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.keypad button{min-height:58px;border-radius:14px;background:#fff;border:2px solid var(--bd);font-size:30px;font-weight:700}
+.keypad .fn{font-size:20px;background:#eee9dd}
+
+/* 傳過的單 */
+.card{display:block;width:100%;text-align:left;background:#fff;border:2px solid var(--bd);border-radius:14px;padding:10px 14px;margin-bottom:10px}
+.card .d{font-size:24px;font-weight:700}
+.card .m{font-size:18px;color:var(--mu)}
+.card .tag{display:inline-block;font-size:15px;background:#fff1c9;color:#7a5b00;border-radius:6px;padding:0 6px;margin-left:6px;vertical-align:3px}
+.preview{width:100%;border:2px solid var(--bd);border-radius:8px;background:#fff;display:block}
+
+/* 設定 */
+.sec{background:#fff;border:2px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:12px}
+.sec h3{margin:0 0 8px;font-size:22px}
+.sec input[type=text]{width:100%;font-size:24px;padding:8px 10px;border:2px solid var(--bd);border-radius:10px;margin-bottom:8px}
+.sec .namerow{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eee;padding:6px 0}
+.sec .namerow button{font-size:17px;color:var(--rd);border:2px solid #e9b4b4;border-radius:10px;padding:6px 12px}
+.sec p{font-size:17px;color:var(--mu);margin:4px 0 8px}
+.sec .btn{margin-bottom:8px}
+
+/* 對話框與提示 */
+#mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+#mask.show{display:flex}
+.dlg{background:#fff;border-radius:18px;width:100%;max-width:480px;max-height:90vh;overflow:auto;padding:18px}
+.dlg h2{margin:0 0 10px;font-size:26px}
+.dlg .body{font-size:22px;margin-bottom:14px}
+.dlg .body input[type=date]{width:100%;font-size:24px;padding:10px;border:2px solid var(--bd);border-radius:10px;margin-top:6px}
+.dlg .body .btn{width:100%;margin-bottom:8px}
+.dlg .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dlg .btns.one{grid-template-columns:1fr}
+#toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);background:#333;color:#fff;font-size:22px;border-radius:14px;padding:12px 16px;display:none;align-items:center;gap:12px;z-index:60;max-width:92vw;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#toast.show{display:flex}
+#toast button{background:#ffd54f;color:#000;font-weight:700;border-radius:10px;padding:8px 14px;font-size:22px;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- 主畫面：目前這張出貨單 -->
+<section id="scr-main" class="screen active">
+  <header class="top">
+    <div class="title" id="mainTitle">長興自然農耕</div>
+    <button class="date-btn" id="dateBtn"></button>
+    <button class="gear" id="settingsBtn">設定</button>
+  </header>
+  <div id="list" class="list"></div>
+  <div class="total" id="total"></div>
+  <div class="actions">
+    <button class="btn green wide" id="addBtn">＋ 加一樣菜</button>
+    <button class="btn line" id="shareBtn">傳出去<br>（LINE）</button>
+    <button class="btn white" id="historyBtn">看傳過<br>的單</button>
+  </div>
+</section>
+
+<!-- 加菜／修改 -->
+<section id="scr-edit" class="screen">
+  <div class="bar" id="editTitle">加一樣菜</div>
+  <div class="fields">
+    <div class="field" data-f="name"><span class="lab">品名</span><input id="fName" type="text" autocomplete="off" enterkeyhint="done" placeholder="從下面選，或用說的"></div>
+    <div class="field" data-f="weight"><span class="lab">重量</span><div class="val" id="fWeight"></div><span class="unit">克</span></div>
+    <div class="field" data-f="price"><span class="lab">金額</span><div class="val" id="fPrice"></div><span class="unit">元</span></div>
+    <div class="hint" id="lastHint"></div>
+  </div>
+  <div class="tools" id="editTools">
+    <button id="upBtn">往上移</button><button id="downBtn">往下移</button><button class="del" id="delBtn">刪掉這樣</button>
+  </div>
+  <div class="panel" id="panel"></div>
+  <div class="bottom">
+    <button class="btn gray" id="cancelBtn">取消</button>
+    <button class="btn green" id="saveBtn">存好了</button>
+  </div>
+</section>
+
+<!-- 傳過的單 -->
+<section id="scr-history" class="screen">
+  <div class="bar">傳過的單</div>
+  <div class="scroll" id="historyList"></div>
+  <div class="bottom one"><button class="btn gray" data-back>回去</button></div>
+</section>
+
+<!-- 看某一張傳過的單 -->
+<section id="scr-view" class="screen">
+  <div class="bar" id="viewTitle">傳過的單</div>
+  <div class="scroll"><div class="m" id="viewMeta" style="font-size:18px;color:#666;margin-bottom:8px"></div><img class="preview" id="viewImg" alt="出貨單圖片"></div>
+  <div class="actions">
+    <button class="btn line" id="resendBtn">再傳一次</button>
+    <button class="btn white" id="restoreBtn">拿這張<br>回來改</button>
+    <button class="btn gray wide" data-back>回去</button>
+  </div>
+</section>
+
+<!-- 設定 -->
+<section id="scr-settings" class="screen">
+  <div class="bar">設定</div>
+  <div class="scroll">
+    <div class="sec">
+      <h3>單子最上面的名稱</h3>
+      <input type="text" id="titleInput">
+      <button class="btn green" id="titleSave" style="width:100%">存名稱</button>
+    </div>
+    <div class="sec">
+      <h3>常賣的菜</h3>
+      <p>打錯字或不要的菜可以刪掉，不會影響已經傳過的單。</p>
+      <div id="nameList"></div>
+    </div>
+    <div class="sec">
+      <h3>備份</h3>
+      <p>把所有資料存成一個檔案，換手機或清掉資料時可以還原。</p>
+      <button class="btn white" id="backupBtn" style="width:100%">存一份備份檔</button>
+      <button class="btn white" id="restoreFileBtn" style="width:100%">從備份檔還原</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" style="display:none">
+    </div>
+    <p style="text-align:center;font-size:15px;color:#999" id="ver"></p>
+  </div>
+  <div class="bottom one"><button class="btn gray" data-back>回去</button></div>
+</section>
+
+<div id="mask"><div class="dlg" id="dlg"></div></div>
+<div id="toast"><span id="toastMsg"></span><button id="toastBtn">復原</button></div>
+
+<script>
+'use strict';
+const VERSION = '1.0.1';
+const KEY = 'changxing-shipping-v1';
+const $ = id => document.getElementById(id);
+let toastTimer = null;
+
+/* ---------- 資料 ---------- */
+// 媽媽原本試算表上的菜，當作第一次打開時的起點（價錢留空讓她自己填）
+const SEED_ITEMS = [['地瓜葉',250],['珂白菜',250],['芥菜',250],['綠天使萵苣',230],['韭菜',200],['黑芥藍',250],
+  ['萵筍',600],['高麗菜',600],['白玉蘿蔔',600],['冬瓜',600],['珍芭',600]];
+const EXTRA_SEED = [['芋頭',600],['火龍果',600],['紅芭',600]];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function defaultState(){
+  const now = Date.now(), usage = {};
+  [...SEED_ITEMS, ...EXTRA_SEED].forEach(([n, w], i) => { usage[n] = { weight: w, price: null, times: [], last: now - i * 1000 }; });
+  return { v: 1, title: '長興自然農耕',
+    sheet: { date: todayStr(), items: SEED_ITEMS.map(([n, w]) => ({ id: uid(), name: n, weight: w, price: null })) },
+    history: [], usage };
+}
+// 檢查並整理資料；格式不對就回傳 null（備份檔還原、啟動讀取都用這個）
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function numOrNull(v){ return (typeof v === 'number' && isFinite(v) && v >= 0 && v < 1e13) ? v : null; }
+function cleanItems(arr, withId){
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const it of arr) {
+    if (!it || typeof it !== 'object' || typeof it.name !== 'string' || !it.name.trim()) return null;
+    const o = { name: it.name.trim().slice(0, 40), weight: numOrNull(it.weight), price: numOrNull(it.price) };
+    if (withId) o.id = (typeof it.id === 'string' && it.id) ? it.id : uid();
+    out.push(o);
+  }
+  return out;
+}
+function normalizeState(s){
+  if (!s || typeof s !== 'object' || !s.sheet || typeof s.sheet !== 'object') return null;
+  if (!DATE_RE.test(s.sheet.date || '')) return null;
+  const items = cleanItems(s.sheet.items, true); if (!items) return null;
+  const title = (typeof s.title === 'string' && s.title.trim()) ? s.title.trim().slice(0, 40) : '長興自然農耕';
+  if (!Array.isArray(s.history)) return null;
+  const history = [];
+  for (const h of s.history) {
+    if (!h || typeof h !== 'object' || !h.sheet || !DATE_RE.test(h.sheet.date || '')) return null;
+    const hi = cleanItems(h.sheet.items, false); if (!hi) return null;
+    history.push({ id: (typeof h.id === 'string' && h.id) ? h.id : uid(), kind: h.kind === 'auto' ? 'auto' : 'sent',
+      sheet: { title: typeof h.sheet.title === 'string' ? h.sheet.title : title, date: h.sheet.date, items: hi },
+      firstAt: numOrNull(h.firstAt) || Date.now(), lastSentAt: numOrNull(h.lastSentAt), sendCount: numOrNull(h.sendCount) || 0 });
+  }
+  if (!s.usage || typeof s.usage !== 'object' || Array.isArray(s.usage)) return null;
+  const usage = {};
+  for (const n of Object.keys(s.usage)) {
+    const u = s.usage[n]; if (!n.trim() || !u || typeof u !== 'object') continue;
+    usage[n] = { weight: numOrNull(u.weight), price: numOrNull(u.price),
+      times: Array.isArray(u.times) ? u.times.filter(t => numOrNull(t)).slice(-40) : [], last: numOrNull(u.last) || 0 };
+  }
+  return { v: 1, title, sheet: { date: s.sheet.date, items }, history: history.slice(0, 300), usage };
+}
+let loadProblem = null;   // 'broken'：手機裡原本的資料讀不懂；'nosave'：根本存不了
+function load(){
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { loadProblem = 'nosave'; return defaultState(); }
+  if (raw === null) return defaultState();           // 第一次使用
+  try { const s = normalizeState(JSON.parse(raw)); if (s) return s; } catch (e) {}
+  // 原本有資料但讀不懂：先另外留一份原始內容，絕不直接蓋掉
+  try { localStorage.setItem(KEY + '-broken-' + Date.now(), raw); loadProblem = 'broken'; }
+  catch (e) { loadProblem = 'nosave'; }
+  return defaultState();
+}
+let S = load();
+let saveWarned = false;
+function save(){
+  if (loadProblem === 'nosave') { warnSaveFail(); return false; }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
+  catch (e) { warnSaveFail(); return false; }
+}
+function warnSaveFail(){
+  if (saveWarned) return;
+  saveWarned = true;
+  setTimeout(() => { tell('手機空間不夠，剛剛的資料<b>沒有存進去</b>。<br><span style="font-size:19px;color:#666">請找家人幫忙清出手機空間。</span>').then(() => { saveWarned = false; }); }, 0);
+}
+if (loadProblem !== 'nosave') save();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+/* ---------- 格式 ---------- */
+const WEEK = '日一二三四五六';
+function parseDate(ds){ const [y, m, d] = ds.split('-').map(Number); return { y, m, d, w: new Date(y, m - 1, d).getDay() }; }
+function fmtDate(ds){ const p = parseDate(ds); return `${p.y}年${p.m}月${p.d}日（星期${WEEK[p.w]}）`; }
+function fmtDateMain(ds){ const p = parseDate(ds); return `${p.m}月${p.d}日（星期${WEEK[p.w]}）`; }
+function fmtDateShort(ds){ const p = parseDate(ds); return `${p.m}月${p.d}日`; }
+function fmtDateFull(ds){ const p = parseDate(ds); return `${p.y}年${p.m}月${p.d}日`; }
+function fmtTime(ts){
+  const d = new Date(ts), h = d.getHours();
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${h < 12 ? '上午' : '下午'}${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+function hasNum(v){ return v !== null && v !== undefined && v !== '' && !isNaN(v); }
+function sheetTotal(sheet){
+  let sum = 0, missing = 0;
+  sheet.items.forEach(it => { if (hasNum(it.price)) sum += Number(it.price); else missing++; });
+  return { sum, missing, count: sheet.items.length };
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function snapshotOf(sheet, title){
+  return { title: title || S.title, date: sheet.date, items: sheet.items.map(it => ({ name: it.name, weight: hasNum(it.weight) ? Number(it.weight) : null, price: hasNum(it.price) ? Number(it.price) : null })) };
+}
+function same(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+
+/* ---------- 常賣的菜（依最近使用自動排序，跟著季節走） ---------- */
+const DAY = 864e5;
+function touchUsage(name, weight, price){
+  if (!name) return;
+  const now = Date.now();
+  const u = S.usage[name] || (S.usage[name] = { weight: null, price: null, times: [], last: 0 });
+  if (weight !== undefined) u.weight = hasNum(weight) ? Number(weight) : null;
+  if (price !== undefined) u.price = hasNum(price) ? Number(price) : null;
+  u.times = u.times || [];
+  const lastT = u.times[u.times.length - 1];
+  if (!lastT || new Date(lastT).toDateString() !== new Date(now).toDateString()) u.times.push(now);
+  if (u.times.length > 40) u.times = u.times.slice(-40);
+  u.last = now;
+}
+function rankedNames(){
+  const now = Date.now();
+  return Object.keys(S.usage).map(n => {
+    const u = S.usage[n];
+    let s = 0; (u.times || []).forEach(t => { s += Math.exp(-(now - t) / (30 * DAY)); });
+    return { n, s, last: u.last || 0 };
+  }).sort((a, b) => (b.s - a.s) || (b.last - a.last)).map(x => x.n);
+}
+function weightPresets(){
+  const cnt = {};
+  Object.values(S.usage).forEach(u => { if (hasNum(u.weight)) cnt[u.weight] = (cnt[u.weight] || 0) + 1 + (u.times || []).length; });
+  const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 4).map(Number);
+  [200, 250, 300, 600].forEach(w => { if (top.length < 4 && !top.includes(w)) top.push(w); });
+  return top.sort((a, b) => a - b);
+}
+
+/* ---------- 畫面切換（手機的返回鍵會回上一頁，不會直接跳出） ---------- */
+const nav = { stack: ['main'] };
+history.replaceState({ depth: 1 }, '');
+function show(name){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'scr-' + name));
+  if (name === 'main') renderMain();
+  if (name === 'history') renderHistory();
+  if (name === 'settings') renderSettings();
+}
+function openScreen(name){
+  hideToast();
+  nav.stack.push(name);
+  history.pushState({ depth: nav.stack.length }, '');
+  show(name);
+}
+function goBack(steps){ history.go(-(steps || 1)); }
+let skipGuard = false;
+window.addEventListener('popstate', async e => {
+  const depth = (e.state && e.state.depth) || 1;
+  if (dlgClosing) { const f = dlgClosing; dlgClosing = null; f(); return; }
+  if (dlgOpen) { closeDialog(null, false); return; }   // 返回鍵關掉對話框
+  const cur = nav.stack[nav.stack.length - 1];
+  if (cur === 'edit' && depth < nav.stack.length && !skipGuard && editDirty()) {
+    history.pushState({ depth: nav.stack.length }, '');
+    const ok = await ask('剛剛改的還沒存，要丟掉嗎？', '丟掉不要了', '繼續改');
+    if (ok) { skipGuard = true; history.back(); }
+    return;
+  }
+  skipGuard = false;
+  stopListen();
+  nav.stack.length = Math.max(1, Math.min(depth, nav.stack.length));
+  show(nav.stack[nav.stack.length - 1]);
+});
+document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => goBack()));
+
+/* ---------- 對話框 ---------- */
+let dlgOpen = null;
+function dialog({ title, body, buttons, collect }){
+  return new Promise(resolve => {
+    const d = $('dlg');
+    d.innerHTML = (title ? `<h2>${title}</h2>` : '') + `<div class="body">${body || ''}</div>` +
+      `<div class="btns ${buttons.length === 1 ? 'one' : ''}">` +
+      buttons.map((b, i) => `<button class="btn ${b.cls || 'gray'}" data-i="${i}">${b.label}</button>`).join('') + '</div>';
+    dlgOpen = { resolve };
+    history.pushState({ depth: nav.stack.length, dlg: 1 }, '');   // 讓返回鍵先關對話框
+    d.onclick = ev => {
+      const t = ev.target.closest('button[data-i],button[data-v]');
+      if (!t) return;
+      const value = t.dataset.v !== undefined ? t.dataset.v : buttons[+t.dataset.i].value;
+      const data = collect ? collect(d) : undefined;
+      closeDialog({ value, data }, true);
+    };
+    $('mask').classList.add('show');
+    if (onOpenDialog) { const f = onOpenDialog; onOpenDialog = null; f(d); }
+  });
+}
+let onOpenDialog = null, dlgClosing = null;
+// viaButton：按對話框按鈕關閉時，把剛剛加的那一步返回紀錄退掉，退完才算關好
+function closeDialog(result, viaButton){
+  if (!dlgOpen) return;
+  const { resolve } = dlgOpen; dlgOpen = null;
+  $('mask').classList.remove('show'); $('dlg').innerHTML = ''; $('dlg').onclick = null;
+  const r = result || { value: null };
+  if (viaButton) { dlgClosing = () => resolve(r); history.back(); }
+  else resolve(r);
+}
+async function ask(msg, yes, no){
+  const r = await dialog({ body: msg, buttons: [{ label: no, value: false, cls: 'gray' }, { label: yes, value: true, cls: 'red' }] });
+  return r.value === true;
+}
+function tell(msg){ return dialog({ body: msg, buttons: [{ label: '知道了', value: true, cls: 'green' }] }); }
+
+function toast(msg, undoFn){
+  $('toastMsg').textContent = msg;
+  const b = $('toastBtn');
+  b.style.display = undoFn ? '' : 'none';
+  b.onclick = () => { hideToast(); if (undoFn) undoFn(); };
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, undoFn ? 8000 : 2500);
+}
+function hideToast(){ $('toast').classList.remove('show'); }
+
+/* ---------- 主畫面 ---------- */
+function renderMain(){
+  $('mainTitle').textContent = S.title;
+  $('dateBtn').innerHTML = `${fmtDateMain(S.sheet.date)}<span class="pen">改日期</span>`;
+  const list = $('list');
+  if (!S.sheet.items.length) {
+    list.innerHTML = '<div class="empty">這張單還沒有菜<br>請按下面的「＋ 加一樣菜」</div>';
+  } else {
+    list.innerHTML = S.sheet.items.map((it, i) =>
+      `<button class="row" data-i="${i}"><span class="no">${i + 1}</span><span class="nm">${esc(it.name)}</span>` +
+      `<span class="wt">${hasNum(it.weight) ? it.weight + '<small>克</small>' : ''}</span>` +
+      `<span class="pr">${hasNum(it.price) ? it.price + '<small>元</small>' : '<em>沒填</em>'}</span></button>`).join('');
+  }
+  const t = sheetTotal(S.sheet);
+  $('total').innerHTML = `合計 ${t.count} 樣，共 <b>${t.sum}</b> 元` + (t.missing ? `<div class="warn">有 ${t.missing} 樣還沒填金額</div>` : '');
+}
+$('list').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) openEdit(+r.dataset.i); });
+$('addBtn').addEventListener('click', () => openEdit(-1));
+$('historyBtn').addEventListener('click', () => openScreen('history'));
+$('settingsBtn').addEventListener('click', () => openScreen('settings'));
+$('shareBtn').addEventListener('click', () => {
+  if (!S.sheet.items.length) { tell('這張單還沒有菜，先加菜再傳。'); return; }
+  shareSheet(snapshotOf(S.sheet), null);
+});
+$('dateBtn').addEventListener('click', async () => {
+  const today = todayStr();
+  const r = await dialog({
+    title: '這張單的日期',
+    body: `<button class="btn green" data-v="today">改成今天（${fmtDateShort(today)}）</button>` +
+      `<div style="font-size:19px;color:#666;margin-top:6px">或選別的日子：</div><input type="date" id="dateInput" value="${S.sheet.date}">`,
+    buttons: [{ label: '不改', value: null, cls: 'gray' }, { label: '用選的日子', value: 'pick', cls: 'green' }],
+    collect: d => d.querySelector('#dateInput').value
+  });
+  let nd = null;
+  if (r.value === 'today') nd = today;
+  else if (r.value === 'pick' && /^\d{4}-\d{2}-\d{2}$/.test(r.data || '')) nd = r.data;
+  if (nd && nd !== S.sheet.date) {
+    const old = S.sheet.date; S.sheet.date = nd;
+    if (save()) toast('日期改好了'); else S.sheet.date = old;
+    renderMain();
+  }
+});
+
+/* ---------- 加菜／修改 ---------- */
+let E = null;
+function openEdit(i){
+  const it = i >= 0 ? S.sheet.items[i] : null;
+  E = { index: i, draft: it ? { name: it.name, weight: it.weight, price: it.price } : { name: '', weight: null, price: null },
+        active: it ? 'price' : 'name', fresh: true, saved: false };
+  E.orig = JSON.stringify(E.draft);
+  $('fName').value = E.draft.name;
+  openScreen('edit');
+  renderEdit();
+}
+function editDirty(){
+  if (!E || E.saved) return false;
+  const cur = { ...E.draft, name: $('fName').value.trim() };
+  return JSON.stringify(cur) !== E.orig;
+}
+function renderEditFields(){
+  const valHtml = (v, f) => {
+    if (!hasNum(v)) return `<span class="ph">點這裡輸入</span>`;
+    return `<span>${v}</span>`;
+  };
+  ['weight', 'price'].forEach(f => {
+    const el = f === 'weight' ? $('fWeight') : $('fPrice');
+    el.innerHTML = valHtml(E.draft[f], f);
+    el.classList.toggle('sel', E.active === f && E.fresh && hasNum(E.draft[f]));
+  });
+  document.querySelectorAll('#scr-edit .field').forEach(el => el.classList.toggle('active', el.dataset.f === E.active));
+  const name = $('fName').value.trim(), u = S.usage[name];
+  $('lastHint').textContent = u && (hasNum(u.weight) || hasNum(u.price))
+    ? `上次：${hasNum(u.weight) ? u.weight + '克' : ''}${hasNum(u.weight) && hasNum(u.price) ? '、' : ''}${hasNum(u.price) ? u.price + '元' : ''}` : '';
+}
+function renderEdit(){
+  $('editTitle').textContent = E.index >= 0 ? `修改第 ${E.index + 1} 樣` : '加一樣菜';
+  $('editTools').style.display = E.index >= 0 ? '' : 'none';
+  $('upBtn').disabled = E.index <= 0; $('upBtn').style.opacity = E.index <= 0 ? .35 : 1;
+  const last = E.index >= S.sheet.items.length - 1;
+  $('downBtn').disabled = last; $('downBtn').style.opacity = last ? .35 : 1;
+  renderEditFields();
+  renderPanel();
+}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function renderPanel(){
+  const p = $('panel');
+  if (E.active === 'name') {
+    const onSheet = new Set(S.sheet.items.filter((_, i) => i !== E.index).map(it => it.name));
+    const ranked = rankedNames();
+    const names = ranked.filter(n => !onSheet.has(n)).concat(ranked.filter(n => onSheet.has(n)));
+    p.innerHTML = `<div class="inbtns">` +
+      (SR ? `<button class="mic" id="micBtn">🎤 用說的</button>` : '') +
+      `<button id="typeBtn" ${SR ? '' : 'style="grid-column:1/-1"'}>⌨ 用打的</button></div>` +
+      `<div class="sub">常賣的菜（點一下就好）</div>` +
+      (names.length ? `<div class="grid">` + names.map(n =>
+        `<button class="chip ${onSheet.has(n) ? 'on' : ''}" data-n="${esc(n)}">${esc(n)}${onSheet.has(n) ? '<small>單上有了</small>' : ''}</button>`).join('') + '</div>'
+        : '<div class="sub">還沒有常賣的菜，用說的或打字加進來，下次就會出現在這裡。</div>');
+  } else {
+    const keys = ['1','2','3','4','5','6','7','8','9','清除','0','退一格'];
+    p.innerHTML = (E.active === 'weight'
+      ? `<div class="sub">常用的重量</div><div class="presets">${weightPresets().map(w => `<button data-w="${w}">${w}</button>`).join('')}</div>`
+      : `<div class="sub">按數字輸入金額${hasNum(E.draft.price) ? '（直接按數字會重新輸入）' : ''}</div>`) +
+      `<div class="keypad">${keys.map(k => `<button data-k="${k}" class="${k.length > 1 ? 'fn' : ''}">${k}</button>`).join('')}</div>`;
+  }
+}
+function setActive(f){
+  if (E.active === f) return;
+  E.active = f; E.fresh = true;
+  if (f !== 'name') $('fName').blur();
+  stopListen();
+  renderEditFields(); renderPanel();
+}
+document.querySelectorAll('#scr-edit .field').forEach(el => el.addEventListener('click', () => {
+  setActive(el.dataset.f);
+}));
+$('fName').addEventListener('focus', () => setActive('name'));
+$('fName').addEventListener('input', () => { E.draft.name = $('fName').value.trim(); renderEditFields(); });
+$('fName').addEventListener('change', () => { autofill($('fName').value.trim(), false); renderEditFields(); });
+$('fName').addEventListener('keydown', e => { if (e.key === 'Enter') { $('fName').blur(); autofill($('fName').value.trim(), false); setActive('price'); } });
+
+function autofill(name, overwrite){
+  const u = S.usage[name];
+  if (!u) return;
+  if (hasNum(u.weight) && (overwrite || !hasNum(E.draft.weight))) E.draft.weight = u.weight;
+  if (hasNum(u.price) && (overwrite || !hasNum(E.draft.price))) E.draft.price = u.price;
+}
+function pickName(n){
+  n = n.trim(); if (!n) return;
+  $('fName').value = n; E.draft.name = n;
+  const u = S.usage[n];   // 換成別樣菜：重量、金額整個換成這樣菜上次的，沒有就空白
+  E.draft.weight = u && hasNum(u.weight) ? u.weight : null;
+  E.draft.price = u && hasNum(u.price) ? u.price : null;
+  E.active = hasNum(E.draft.weight) ? 'price' : 'weight';
+  E.fresh = true;
+  renderEdit();
+}
+$('panel').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.n !== undefined) { pickName(b.dataset.n); return; }
+  if (b.id === 'micBtn') { startListen(); return; }
+  if (b.id === 'typeBtn') { $('fName').focus(); return; }
+  if (b.dataset.w !== undefined) { E.draft.weight = Number(b.dataset.w); E.active = 'price'; E.fresh = true; renderEdit(); return; }
+  if (b.dataset.k !== undefined) pressKey(b.dataset.k);
+});
+function pressKey(k){
+  const f = E.active; if (f !== 'weight' && f !== 'price') return;
+  let v = hasNum(E.draft[f]) ? String(E.draft[f]) : '';
+  if (k === '清除') v = '';
+  else if (k === '退一格') v = E.fresh ? '' : v.slice(0, -1);
+  else if (E.fresh) v = k;
+  else if (v.length < 6) v = (v === '0' ? k : v + k);
+  E.fresh = false;
+  E.draft[f] = v === '' ? null : Number(v);
+  renderEditFields();
+  if (E.active === 'price') renderPanel();
+}
+$('saveBtn').addEventListener('click', () => {
+  if (!E || E.saved) return;            // 已經存過（連點）就不再存
+  const name = $('fName').value.trim();
+  if (!name) { toast('請先選菜名，或用說的、打字'); setActive('name'); return; }
+  const item = { name, weight: hasNum(E.draft.weight) ? Number(E.draft.weight) : null, price: hasNum(E.draft.price) ? Number(E.draft.price) : null };
+  const backupItems = JSON.stringify(S.sheet.items), backupUsage = JSON.stringify(S.usage);
+  if (E.index >= 0 && S.sheet.items[E.index]) Object.assign(S.sheet.items[E.index], item);
+  else S.sheet.items.push({ id: uid(), ...item });
+  touchUsage(name, item.weight, item.price);
+  if (!save()) { S.sheet.items = JSON.parse(backupItems); S.usage = JSON.parse(backupUsage); return; }
+  E.saved = true;
+  goBack();
+  toast(E.index >= 0 ? '改好了' : `加好了：${name}`);
+});
+$('cancelBtn').addEventListener('click', () => goBack());
+$('delBtn').addEventListener('click', async () => {
+  const idx = E.index, it = S.sheet.items[idx];
+  if (!it) return;
+  if (!(await ask(`要把「${esc(it.name)}」從單上刪掉嗎？`, '刪掉', '不要'))) return;
+  if (!E || E.saved || S.sheet.items[idx] !== it) return;
+  S.sheet.items.splice(idx, 1);
+  if (!save()) { S.sheet.items.splice(idx, 0, it); return; }
+  E.saved = true;
+  goBack();
+  toast(`刪掉了「${it.name}」`, () => {
+    S.sheet.items.splice(Math.min(idx, S.sheet.items.length), 0, it); save(); renderMain(); toast('已經放回去了');
+  });
+});
+function moveItem(d){
+  const a = S.sheet.items, i = E.index, j = i + d;
+  if (j < 0 || j >= a.length) return;
+  [a[i], a[j]] = [a[j], a[i]];
+  E.index = j; save(); renderEdit();
+  toast(d < 0 ? '往上移了' : '往下移了');
+}
+$('upBtn').addEventListener('click', () => moveItem(-1));
+$('downBtn').addEventListener('click', () => moveItem(1));
+
+/* ---------- 用說的 ---------- */
+let rec = null;
+function stopListen(){ if (rec) { try { rec.abort(); } catch (e) {} rec = null; } }
+function startListen(){
+  if (!SR) { toast('這支手機不能用說的，請用打的'); return; }
+  stopListen();
+  const r = new SR(); rec = r;
+  r.lang = 'zh-TW'; r.interimResults = false; r.maxAlternatives = 1;
+  const btn = $('micBtn');
+  if (btn) { btn.classList.add('listening'); btn.textContent = '請說菜名…'; }
+  let got = false;
+  r.onresult = e => {
+    got = true;
+    let t = (e.results[0][0].transcript || '').replace(/[，。、,.!?！？\s]/g, '');
+    const name = t.replace(/[0-9０-９].*$/, '') || t;
+    if (name) { pickName(name); toast(`聽到：${name}`); }
+  };
+  r.onerror = e => {
+    const m = { 'not-allowed': '請允許使用麥克風才能用說的', 'service-not-allowed': '請允許使用麥克風才能用說的',
+      'no-speech': '沒聽到聲音，再按一次試試看', 'network': '要有網路才能用說的', 'audio-capture': '找不到麥克風' }[e.error];
+    if (m && e.error !== 'aborted') toast(m);
+  };
+  r.onend = () => {
+    if (rec === r) rec = null;
+    const b = $('micBtn');
+    if (b) { b.classList.remove('listening'); b.textContent = '🎤 用說的'; }
+  };
+  try { r.start(); } catch (e) { toast('現在不能用說的，請再試一次'); }
+}
+
+/* ---------- 做成圖片並分享 ---------- */
+const FONT = '"Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
+function renderSheetCanvas(snap){
+  const W = 1080, pad = 50, rowH = 92, headH = 92;
+  const cols = [110, 400, 235, 235]; // 編號、品名、重量、金額（加總 980）
+  const titleH = 100, dateH = 70, gap = 24;
+  const n = snap.items.length;
+  const H = pad + titleH + dateH + gap + headH + rowH * n + rowH + pad;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `bold 64px ${FONT}`; g.fillText(snap.title || '', W / 2, pad + titleH / 2);
+  g.font = `44px ${FONT}`; g.fillText(fmtDateFull(snap.date), W / 2, pad + titleH + dateH / 2);
+  const x0 = pad, y0 = pad + titleH + dateH + gap;
+  const xs = [x0]; cols.forEach(w => xs.push(xs[xs.length - 1] + w));
+  const tableW = xs[xs.length - 1] - x0;
+  // 表頭底色
+  g.fillStyle = '#e3f0e3'; g.fillRect(x0, y0, tableW, headH);
+  g.fillStyle = '#fff8dc'; g.fillRect(x0, y0 + headH + rowH * n, tableW, rowH);
+  const fit = (text, maxW, size, bold) => {
+    let s = size;
+    do { g.font = `${bold ? 'bold ' : ''}${s}px ${FONT}`; if (g.measureText(text).width <= maxW) break; s -= 2; } while (s > 20);
+  };
+  const cell = (text, ci, y, h, opts = {}) => {
+    const w = opts.span ? xs[ci + opts.span] - xs[ci] : cols[ci];
+    fit(String(text), w - 24, opts.size || 46, opts.bold);
+    g.fillStyle = opts.color || '#111';
+    g.textAlign = opts.align || 'center';
+    const x = opts.align === 'right' ? xs[ci] + w - 18 : opts.align === 'left' ? xs[ci] + 18 : xs[ci] + w / 2;
+    g.fillText(String(text), x, y + h / 2 + 2);
+  };
+  ['編號', '品名', '重量（克）', '金額（元）'].forEach((t, i) => cell(t, i, y0, headH, { bold: true, size: 40 }));
+  snap.items.forEach((it, r) => {
+    const y = y0 + headH + rowH * r;
+    cell(r + 1, 0, y, rowH, { color: '#555' });
+    cell(it.name, 1, y, rowH, { bold: true });
+    cell(hasNum(it.weight) ? it.weight : '', 2, y, rowH);
+    cell(hasNum(it.price) ? it.price : '', 3, y, rowH);
+  });
+  const t = sheetTotal(snap), yT = y0 + headH + rowH * n;
+  cell(`合計（${n} 樣）`, 0, yT, rowH, { bold: true, span: 3 });
+  cell(t.sum, 3, yT, rowH, { bold: true, color: '#b71c1c' });
+  // 格線
+  g.strokeStyle = '#222'; g.lineWidth = 3;
+  const yEnd = yT + rowH;
+  g.strokeRect(x0, y0, tableW, yEnd - y0);
+  g.lineWidth = 2;
+  for (let r = 0; r <= n + 1; r++) { const y = y0 + headH + rowH * r; if (r <= n) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + tableW, y); g.stroke(); } }
+  xs.slice(1, -1).forEach((x, i) => { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, i < 2 ? yT : yEnd); g.stroke(); });
+  return c;
+}
+function canvasBlob(c){ return new Promise(res => c.toBlob(res, 'image/png')); }
+function recordSent(snap, entry){
+  const now = Date.now();
+  if (entry) {
+    entry.lastSentAt = now; entry.sendCount = (entry.sendCount || 0) + 1; entry.kind = 'sent';
+    const i = S.history.indexOf(entry);
+    if (i > 0) { S.history.splice(i, 1); S.history.unshift(entry); }   // 重傳的移到最前面
+  }
+  else {
+    const idx = S.history.findIndex(h => h.kind === 'sent' && same(h.sheet, snap));
+    if (idx >= 0 && idx === S.history.findIndex(h => h.kind === 'sent')) {
+      const h = S.history.splice(idx, 1)[0]; h.lastSentAt = now; h.sendCount++; S.history.unshift(h);
+    } else {
+      S.history.unshift({ id: uid(), kind: 'sent', sheet: snap, firstAt: now, lastSentAt: now, sendCount: 1 });
+    }
+  }
+  snap.items.forEach(it => touchUsage(it.name));
+  if (S.history.length > 300) S.history.length = 300;
+  save();
+  if (nav.stack[nav.stack.length - 1] === 'history') renderHistory();
+}
+let sharing = false;
+async function shareSheet(snap, entry){
+  if (sharing) return;                  // 連點只算一次
+  sharing = true;
+  try {
+    const c = renderSheetCanvas(snap);
+    const blob = await canvasBlob(c);
+    const file = new File([blob], `出貨單-${snap.date}.png`, { type: 'image/png' });
+    const canFile = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    if (canFile) {
+      try {
+        await navigator.share({ files: [file] });
+        recordSent(snap, entry); toast('傳好了');
+        return;
+      } catch (e) {
+        const n = e && e.name;
+        if (n === 'AbortError') { toast('沒有傳出去'); return; }
+        if (n === 'InvalidStateError') return;           // 上一次分享還沒結束
+        // NotAllowedError（圖片做太久、手勢過期）等：改用下面的畫面，讓她再按一次
+      }
+    }
+    const url = c.toDataURL('image/png');
+    onOpenDialog = d => {
+      const b = d.querySelector('#shareAgain');
+      if (b) b.onclick = () => {
+        navigator.share({ files: [file] })
+          .then(() => { recordSent(snap, entry); closeDialog({ value: 'shared' }, true); toast('傳好了'); })
+          .catch(() => {});
+      };
+    };
+    const r = await dialog({
+      title: '圖片做好了',
+      body: (canFile ? `<button class="btn line" id="shareAgain" style="width:100%">再按一次：傳出去</button>` : '') +
+        `<div style="font-size:19px;margin:8px 0">${canFile ? '或' : ''}用手指按住圖片不放，選「下載圖片」或「分享」。</div><img src="${url}" style="width:100%;border:2px solid #ddd;border-radius:8px">` +
+        (canFile ? '' : `<a class="btn white" style="margin-top:8px;text-decoration:none;color:#111" href="${url}" download="出貨單-${snap.date}.png">存到手機</a>`),
+      buttons: [{ label: canFile ? '不傳了' : '好了', value: canFile ? 'skip' : 'done', cls: canFile ? 'gray' : 'green' }]
+    });
+    // 不能直接分享的手機只能靠長按存圖，無法知道有沒有傳出去，按「好了」就記一份
+    if (!canFile && r.value === 'done') recordSent(snap, entry);
+  } finally {
+    sharing = false;
+  }
+}
+
+/* ---------- 傳過的單 ---------- */
+let viewing = null;
+function renderHistory(){
+  const el = $('historyList');
+  if (!S.history.length) { el.innerHTML = '<div class="empty">還沒有傳過單<br>按「傳出去」以後，這裡就會留一份</div>'; return; }
+  el.innerHTML = S.history.map((h, i) => {
+    const t = sheetTotal(h.sheet);
+    const meta = h.kind === 'sent'
+      ? `最後傳出：${fmtTime(h.lastSentAt)}${h.sendCount > 1 ? `，傳了 ${h.sendCount} 次` : ''}`
+      : `改之前自動留的：${fmtTime(h.firstAt)}`;
+    return `<button class="card" data-id="${esc(h.id)}"><div class="d">${fmtDateFull(h.sheet.date)}的單${h.kind === 'sent' ? '' : '<span class="tag">沒傳出</span>'}</div>` +
+      `<div class="m">${t.count} 樣，共 ${t.sum} 元</div><div class="m">${meta}</div></button>`;
+  }).join('');
+}
+$('historyList').addEventListener('click', e => {
+  const c = e.target.closest('.card'); if (!c) return;
+  viewing = S.history.find(h => h.id === c.dataset.id); if (!viewing) return;
+  $('viewTitle').textContent = `${fmtDateShort(viewing.sheet.date)}的單`;
+  $('viewMeta').textContent = viewing.kind === 'sent' ? `最後傳出：${fmtTime(viewing.lastSentAt)}` : `改之前自動留的：${fmtTime(viewing.firstAt)}`;
+  $('viewImg').src = renderSheetCanvas(viewing.sheet).toDataURL('image/png');
+  openScreen('view');
+});
+$('resendBtn').addEventListener('click', () => { if (viewing) shareSheet(viewing.sheet, viewing); });
+$('restoreBtn').addEventListener('click', async () => {
+  if (!viewing) return;
+  if (!(await ask('要把這張拿回來改嗎？<br><span style="font-size:19px;color:#666">現在手上的單會先自動留一份在「傳過的單」裡，不會不見。</span>', '拿回來改', '不要'))) return;
+  const cur = snapshotOf(S.sheet), oldSheet = S.sheet, oldHist = S.history.slice();
+  if (S.sheet.items.length && !S.history.some(h => same(h.sheet, cur))) {
+    S.history.unshift({ id: uid(), kind: 'auto', sheet: cur, firstAt: Date.now(), lastSentAt: null, sendCount: 0 });
+  }
+  S.sheet = { date: viewing.sheet.date, items: viewing.sheet.items.map(it => ({ id: uid(), ...it })) };
+  if (!save()) { S.sheet = oldSheet; S.history = oldHist; return; }
+  goBack(nav.stack.length - 1);
+  toast('拿回來了，可以開始改');
+});
+
+/* ---------- 設定 ---------- */
+function renderSettings(){
+  $('titleInput').value = S.title;
+  const names = rankedNames();
+  $('nameList').innerHTML = names.length ? names.map(n => `<div class="namerow"><span>${esc(n)}</span><button data-n="${esc(n)}">刪掉</button></div>`).join('')
+    : '<p>還沒有</p>';
+  $('ver').textContent = `版本 ${VERSION}`;
+}
+$('titleSave').addEventListener('click', () => {
+  const t = $('titleInput').value.trim();
+  if (!t) { toast('名稱不能空白'); return; }
+  S.title = t; save(); toast('名稱存好了');
+});
+$('nameList').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-n]'); if (!b) return;
+  const n = b.dataset.n;
+  if (!(await ask(`要把「${esc(n)}」從常賣的菜刪掉嗎？`, '刪掉', '不要'))) return;
+  delete S.usage[n]; save(); renderSettings();
+});
+$('backupBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `長興出貨單備份-${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('備份檔存好了（在「下載」資料夾）');
+});
+$('restoreFileBtn').addEventListener('click', () => $('restoreFile').click());
+$('restoreFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const s = normalizeState(JSON.parse(await f.text()));
+    if (!s) throw new Error('bad');
+    if (!(await ask('用備份檔還原後，現在手機裡的資料會被換掉。確定嗎？', '還原', '不要'))) return;
+    const old = S;
+    try { localStorage.setItem(KEY + '-before-restore', JSON.stringify(old)); } catch (e2) {}
+    S = s;
+    if (save()) toast('還原好了'); else S = old;
+    renderSettings();
+  } catch (err) { tell('這個檔案不是出貨單的備份檔。'); }
+});
+
+/* ---------- 啟動 ---------- */
+show('main');
+if (loadProblem === 'broken') tell('手機裡原本的資料讀不出來，已經另外留一份原始資料，先用一張新的單。<br><span style="font-size:19px;color:#666">請找家人幫忙看看。</span>');
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
