@@ -51,7 +51,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .row em{font-style:normal;color:#b0a890;font-size:18px;font-weight:400}
 .empty{text-align:center;color:var(--mu);padding:60px 10px;font-size:24px}
 .total{background:#fff8dc;border-top:2px solid var(--bd);padding:8px 14px;font-size:24px;text-align:center}
-.total b{font-size:30px;color:var(--rd)}
+.total b{font-size:28px}
 .total .warn{font-size:18px;color:#a35b00}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 
@@ -207,7 +207,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
 <script>
 'use strict';
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 const KEY = 'changxing-shipping-v1';
 const $ = id => document.getElementById(id);
 let toastTimer = null;
@@ -457,7 +457,7 @@ function renderMain(){
       `<span class="pr">${hasNum(it.price) ? it.price + '<small>元</small>' : '<em>沒填</em>'}</span></button>`).join('');
   }
   const t = sheetTotal(S.sheet);
-  $('total').innerHTML = `合計 ${t.count} 樣，共 <b>${t.sum}</b> 元` + (t.missing ? `<div class="warn">有 ${t.missing} 樣還沒填金額</div>` : '');
+  $('total').innerHTML = `共 <b>${t.count}</b> 樣菜` + (t.missing ? `<div class="warn">有 ${t.missing} 樣還沒填金額</div>` : '');
 }
 $('list').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) openEdit(+r.dataset.i); });
 $('addBtn').addEventListener('click', () => openEdit(-1));
@@ -683,7 +683,7 @@ function renderSheetCanvas(snap){
   const cols = [110, 400, 235, 235]; // 編號、品名、重量、金額（加總 980）
   const titleH = 100, dateH = 70, gap = 24;
   const n = snap.items.length;
-  const H = pad + titleH + dateH + gap + headH + rowH * n + rowH + pad;
+  const H = pad + titleH + dateH + gap + headH + rowH * n + pad;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
@@ -695,7 +695,6 @@ function renderSheetCanvas(snap){
   const tableW = xs[xs.length - 1] - x0;
   // 表頭底色
   g.fillStyle = '#e3f0e3'; g.fillRect(x0, y0, tableW, headH);
-  g.fillStyle = '#fff8dc'; g.fillRect(x0, y0 + headH + rowH * n, tableW, rowH);
   const fit = (text, maxW, size, bold) => {
     let s = size;
     do { g.font = `${bold ? 'bold ' : ''}${s}px ${FONT}`; if (g.measureText(text).width <= maxW) break; s -= 2; } while (s > 20);
@@ -716,16 +715,13 @@ function renderSheetCanvas(snap){
     cell(hasNum(it.weight) ? it.weight : '', 2, y, rowH);
     cell(hasNum(it.price) ? it.price : '', 3, y, rowH);
   });
-  const t = sheetTotal(snap), yT = y0 + headH + rowH * n;
-  cell(`合計（${n} 樣）`, 0, yT, rowH, { bold: true, span: 3 });
-  cell(t.sum, 3, yT, rowH, { bold: true, color: '#b71c1c' });
-  // 格線
-  g.strokeStyle = '#222'; g.lineWidth = 3;
-  const yEnd = yT + rowH;
+  // 格線（價格表，不加總）
+  const yEnd = y0 + headH + rowH * n;
+  g.strokeStyle = '#222'; g.lineWidth = 2;
+  for (let r = 0; r < n; r++) { const y = y0 + headH + rowH * r; g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + tableW, y); g.stroke(); }
+  xs.slice(1, -1).forEach(x => { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, yEnd); g.stroke(); });
+  g.lineWidth = 3;
   g.strokeRect(x0, y0, tableW, yEnd - y0);
-  g.lineWidth = 2;
-  for (let r = 0; r <= n + 1; r++) { const y = y0 + headH + rowH * r; if (r <= n) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + tableW, y); g.stroke(); } }
-  xs.slice(1, -1).forEach((x, i) => { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, i < 2 ? yT : yEnd); g.stroke(); });
   return c;
 }
 function canvasBlob(c){ return new Promise(res => c.toBlob(res, 'image/png')); }
@@ -815,7 +811,7 @@ function renderHistory(){
       ? `最後傳出：${fmtTime(h.lastSentAt)}${h.sendCount > 1 ? `，傳了 ${h.sendCount} 次` : ''}`
       : `改之前自動留的：${fmtTime(h.firstAt)}`;
     return `<button class="card" data-id="${esc(h.id)}"><div class="d">${fmtDateFull(h.sheet.date)}的單${h.kind === 'sent' ? '' : '<span class="tag">沒傳出</span>'}</div>` +
-      `<div class="m">${t.count} 樣，共 ${t.sum} 元</div><div class="m">${meta}</div></button>`;
+      `<div class="m">${t.count} 樣菜</div><div class="m">${meta}</div></button>`;
   }).join('');
 }
 $('historyList').addEventListener('click', e => {
