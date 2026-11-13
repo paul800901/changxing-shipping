@@ -207,7 +207,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 
 <script>
 'use strict';
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 const KEY = 'changxing-shipping-v1';
 const $ = id => document.getElementById(id);
 let toastTimer = null;
@@ -569,10 +569,10 @@ $('fName').addEventListener('keydown', e => { if (e.key === 'Enter') { nameTyped
 function nameTyped(){
   const n = $('fName').value.trim();
   if (!n || n === E.lastName) return;
-  E.lastName = n; E.draft.name = n;
+  E.lastNameBefore = E.lastName; E.lastName = n; E.draft.name = n;
   const u = S.usage[n];
   if (u) { E.draft.weight = hasNum(u.weight) ? u.weight : null; E.draft.price = hasNum(u.price) ? u.price : null; }
-  else if (E.index >= 0) { E.draft.weight = null; E.draft.price = null; }
+  else if (E.lastNameBefore) { E.draft.weight = null; E.draft.price = null; }   // 從別樣菜改過來的，不沿用
 }
 function pickName(n){
   n = n.trim(); if (!n) return;
