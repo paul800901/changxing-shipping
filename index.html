@@ -113,6 +113,8 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .dlg .body .btn{width:100%;margin-bottom:8px}
 .dlg .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .dlg .btns.one{grid-template-columns:1fr}
+#busy{position:fixed;inset:0;z-index:55;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.65);font-size:26px;font-weight:700;color:#2e7d32}
+#busy.show{display:flex}
 #toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);background:#333;color:#fff;font-size:22px;border-radius:14px;padding:12px 16px;display:none;align-items:center;gap:12px;z-index:60;max-width:92vw;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 #toast.show{display:flex}
 #toast button{background:#ffd54f;color:#000;font-weight:700;border-radius:10px;padding:8px 14px;font-size:22px;white-space:nowrap}
@@ -199,12 +201,13 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
   <div class="bottom one"><button class="btn gray" data-back>回去</button></div>
 </section>
 
+<div id="busy">圖片製作中…</div>
 <div id="mask"><div class="dlg" id="dlg"></div></div>
 <div id="toast"><span id="toastMsg"></span><button id="toastBtn">復原</button></div>
 
 <script>
 'use strict';
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 const KEY = 'changxing-shipping-v1';
 const $ = id => document.getElementById(id);
 let toastTimer = null;
@@ -229,6 +232,11 @@ function defaultState(){
 }
 // 檢查並整理資料；格式不對就回傳 null（備份檔還原、啟動讀取都用這個）
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isDate(d){
+  if (typeof d !== 'string' || !DATE_RE.test(d)) return false;
+  const [y, m, dd] = d.split('-').map(Number), t = new Date(y, m - 1, dd);
+  return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === dd;
+}
 function numOrNull(v){ return (typeof v === 'number' && isFinite(v) && v >= 0 && v < 1e13) ? v : null; }
 function cleanItems(arr, withId){
   if (!Array.isArray(arr)) return null;
@@ -243,13 +251,13 @@ function cleanItems(arr, withId){
 }
 function normalizeState(s){
   if (!s || typeof s !== 'object' || !s.sheet || typeof s.sheet !== 'object') return null;
-  if (!DATE_RE.test(s.sheet.date || '')) return null;
+  if (!isDate(s.sheet.date)) return null;
   const items = cleanItems(s.sheet.items, true); if (!items) return null;
   const title = (typeof s.title === 'string' && s.title.trim()) ? s.title.trim().slice(0, 40) : '長興自然農耕';
   if (!Array.isArray(s.history)) return null;
   const history = [];
   for (const h of s.history) {
-    if (!h || typeof h !== 'object' || !h.sheet || !DATE_RE.test(h.sheet.date || '')) return null;
+    if (!h || typeof h !== 'object' || !h.sheet || !isDate(h.sheet.date)) return null;
     const hi = cleanItems(h.sheet.items, false); if (!hi) return null;
     history.push({ id: (typeof h.id === 'string' && h.id) ? h.id : uid(), kind: h.kind === 'auto' ? 'auto' : 'sent',
       sheet: { title: typeof h.sheet.title === 'string' ? h.sheet.title : title, date: h.sheet.date, items: hi },
@@ -364,6 +372,7 @@ window.addEventListener('popstate', async e => {
   const depth = (e.state && e.state.depth) || 1;
   if (dlgClosing) { const f = dlgClosing; dlgClosing = null; f(); return; }
   if (dlgOpen) { closeDialog(null, false); return; }   // 返回鍵關掉對話框
+  if (busy) { history.pushState({ depth: nav.stack.length }, ''); return; }   // 做圖片、分享中先不換畫面
   const cur = nav.stack[nav.stack.length - 1];
   if (cur === 'edit' && depth < nav.stack.length && !skipGuard && editDirty()) {
     history.pushState({ depth: nav.stack.length }, '');
@@ -379,36 +388,44 @@ window.addEventListener('popstate', async e => {
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => goBack()));
 
 /* ---------- 對話框 ---------- */
-let dlgOpen = null;
-function dialog({ title, body, buttons, collect }){
+let dlgOpen = null, dlgClosing = null, dlgChain = Promise.resolve(), dlgSeq = 0;
+// 一次只開一個對話框：後來的排隊，等前一個連同返回紀錄都收好才開
+function dialog(opts){
+  const p = dlgChain.then(() => openDialog(opts));
+  dlgChain = p.then(() => {}, () => {});
+  return p;
+}
+function openDialog({ title, body, buttons, collect, onOpen }){
   return new Promise(resolve => {
-    const d = $('dlg');
+    const d = $('dlg'), token = ++dlgSeq;
     d.innerHTML = (title ? `<h2>${title}</h2>` : '') + `<div class="body">${body || ''}</div>` +
       `<div class="btns ${buttons.length === 1 ? 'one' : ''}">` +
       buttons.map((b, i) => `<button class="btn ${b.cls || 'gray'}" data-i="${i}">${b.label}</button>`).join('') + '</div>';
-    dlgOpen = { resolve };
+    dlgOpen = { resolve, token };
     history.pushState({ depth: nav.stack.length, dlg: 1 }, '');   // 讓返回鍵先關對話框
     d.onclick = ev => {
       const t = ev.target.closest('button[data-i],button[data-v]');
       if (!t) return;
       const value = t.dataset.v !== undefined ? t.dataset.v : buttons[+t.dataset.i].value;
       const data = collect ? collect(d) : undefined;
-      closeDialog({ value, data }, true);
+      closeDialog({ value, data }, true, token);
     };
     $('mask').classList.add('show');
-    if (onOpenDialog) { const f = onOpenDialog; onOpenDialog = null; f(d); }
+    if (onOpen) onOpen(d, token);
   });
 }
-let onOpenDialog = null, dlgClosing = null;
 // viaButton：按對話框按鈕關閉時，把剛剛加的那一步返回紀錄退掉，退完才算關好
-function closeDialog(result, viaButton){
-  if (!dlgOpen) return;
+function closeDialog(result, viaButton, token){
+  if (!dlgOpen || (token !== undefined && dlgOpen.token !== token)) return false;   // 只能關自己那一個
   const { resolve } = dlgOpen; dlgOpen = null;
   $('mask').classList.remove('show'); $('dlg').innerHTML = ''; $('dlg').onclick = null;
   const r = result || { value: null };
   if (viaButton) { dlgClosing = () => resolve(r); history.back(); }
   else resolve(r);
+  return true;
 }
+let busy = false;
+function setBusy(on){ busy = on; $('busy').classList.toggle('show', on); }
 async function ask(msg, yes, no){
   const r = await dialog({ body: msg, buttons: [{ label: no, value: false, cls: 'gray' }, { label: yes, value: true, cls: 'red' }] });
   return r.value === true;
@@ -461,7 +478,7 @@ $('dateBtn').addEventListener('click', async () => {
   });
   let nd = null;
   if (r.value === 'today') nd = today;
-  else if (r.value === 'pick' && /^\d{4}-\d{2}-\d{2}$/.test(r.data || '')) nd = r.data;
+  else if (r.value === 'pick' && isDate(r.data)) nd = r.data;
   if (nd && nd !== S.sheet.date) {
     const old = S.sheet.date; S.sheet.date = nd;
     if (save()) toast('日期改好了'); else S.sheet.date = old;
@@ -476,6 +493,7 @@ function openEdit(i){
   E = { index: i, draft: it ? { name: it.name, weight: it.weight, price: it.price } : { name: '', weight: null, price: null },
         active: it ? 'price' : 'name', fresh: true, saved: false };
   E.orig = JSON.stringify(E.draft);
+  E.lastName = E.draft.name;
   $('fName').value = E.draft.name;
   openScreen('edit');
   renderEdit();
@@ -543,18 +561,22 @@ document.querySelectorAll('#scr-edit .field').forEach(el => el.addEventListener(
 }));
 $('fName').addEventListener('focus', () => setActive('name'));
 $('fName').addEventListener('input', () => { E.draft.name = $('fName').value.trim(); renderEditFields(); });
-$('fName').addEventListener('change', () => { autofill($('fName').value.trim(), false); renderEditFields(); });
-$('fName').addEventListener('keydown', e => { if (e.key === 'Enter') { $('fName').blur(); autofill($('fName').value.trim(), false); setActive('price'); } });
+$('fName').addEventListener('change', () => { nameTyped(); renderEditFields(); });
+$('fName').addEventListener('keydown', e => { if (e.key === 'Enter') { nameTyped(); $('fName').blur(); setActive('price'); } });
 
-function autofill(name, overwrite){
-  const u = S.usage[name];
-  if (!u) return;
-  if (hasNum(u.weight) && (overwrite || !hasNum(E.draft.weight))) E.draft.weight = u.weight;
-  if (hasNum(u.price) && (overwrite || !hasNum(E.draft.price))) E.draft.price = u.price;
+// 打字打完一個菜名：換成別樣菜時，重量、金額換成那樣菜上次的；
+// 修改既有的一列又換成沒紀錄的菜時，清掉舊的重量金額，不沿用別樣菜的價錢
+function nameTyped(){
+  const n = $('fName').value.trim();
+  if (!n || n === E.lastName) return;
+  E.lastName = n; E.draft.name = n;
+  const u = S.usage[n];
+  if (u) { E.draft.weight = hasNum(u.weight) ? u.weight : null; E.draft.price = hasNum(u.price) ? u.price : null; }
+  else if (E.index >= 0) { E.draft.weight = null; E.draft.price = null; }
 }
 function pickName(n){
   n = n.trim(); if (!n) return;
-  $('fName').value = n; E.draft.name = n;
+  $('fName').value = n; E.draft.name = n; E.lastName = n;
   const u = S.usage[n];   // 換成別樣菜：重量、金額整個換成這樣菜上次的，沒有就空白
   E.draft.weight = u && hasNum(u.weight) ? u.weight : null;
   E.draft.price = u && hasNum(u.price) ? u.price : null;
@@ -607,14 +629,18 @@ $('delBtn').addEventListener('click', async () => {
   E.saved = true;
   goBack();
   toast(`刪掉了「${it.name}」`, () => {
-    S.sheet.items.splice(Math.min(idx, S.sheet.items.length), 0, it); save(); renderMain(); toast('已經放回去了');
+    const pos = Math.min(idx, S.sheet.items.length);
+    S.sheet.items.splice(pos, 0, it);
+    if (save()) toast('已經放回去了'); else S.sheet.items.splice(pos, 1);
+    renderMain();
   });
 });
 function moveItem(d){
   const a = S.sheet.items, i = E.index, j = i + d;
   if (j < 0 || j >= a.length) return;
   [a[i], a[j]] = [a[j], a[i]];
-  E.index = j; save(); renderEdit();
+  if (!save()) { [a[i], a[j]] = [a[j], a[i]]; return; }
+  E.index = j; renderEdit();
   toast(d < 0 ? '往上移了' : '往下移了');
 }
 $('upBtn').addEventListener('click', () => moveItem(-1));
@@ -703,8 +729,9 @@ function renderSheetCanvas(snap){
   return c;
 }
 function canvasBlob(c){ return new Promise(res => c.toBlob(res, 'image/png')); }
+// 記一筆「傳過的單」；存不進去就整個退回，回傳 false
 function recordSent(snap, entry){
-  const now = Date.now();
+  const now = Date.now(), histJson = JSON.stringify(S.history), usageJson = JSON.stringify(S.usage);
   if (entry) {
     entry.lastSentAt = now; entry.sendCount = (entry.sendCount || 0) + 1; entry.kind = 'sent';
     const i = S.history.indexOf(entry);
@@ -720,13 +747,19 @@ function recordSent(snap, entry){
   }
   snap.items.forEach(it => touchUsage(it.name));
   if (S.history.length > 300) S.history.length = 300;
-  save();
+  const ok = save();
+  if (!ok) {
+    S.history = JSON.parse(histJson); S.usage = JSON.parse(usageJson);
+    if (viewing) viewing = S.history.find(h => h.id === viewing.id) || null;
+  }
   if (nav.stack[nav.stack.length - 1] === 'history') renderHistory();
+  return ok;
 }
 let sharing = false;
 async function shareSheet(snap, entry){
   if (sharing) return;                  // 連點只算一次
   sharing = true;
+  setBusy(true);
   try {
     const c = renderSheetCanvas(snap);
     const blob = await canvasBlob(c);
@@ -735,9 +768,11 @@ async function shareSheet(snap, entry){
     if (canFile) {
       try {
         await navigator.share({ files: [file] });
-        recordSent(snap, entry); toast('傳好了');
+        setBusy(false);
+        toast(recordSent(snap, entry) ? '傳好了' : '傳出去了，但紀錄沒存到');
         return;
       } catch (e) {
+        setBusy(false);
         const n = e && e.name;
         if (n === 'AbortError') { toast('沒有傳出去'); return; }
         if (n === 'InvalidStateError') return;           // 上一次分享還沒結束
@@ -745,15 +780,16 @@ async function shareSheet(snap, entry){
       }
     }
     const url = c.toDataURL('image/png');
-    onOpenDialog = d => {
-      const b = d.querySelector('#shareAgain');
-      if (b) b.onclick = () => {
-        navigator.share({ files: [file] })
-          .then(() => { recordSent(snap, entry); closeDialog({ value: 'shared' }, true); toast('傳好了'); })
-          .catch(() => {});
-      };
-    };
+    setBusy(false);
     const r = await dialog({
+      onOpen: (d, token) => {
+        const b = d.querySelector('#shareAgain');
+        if (b) b.onclick = () => {
+          navigator.share({ files: [file] })
+            .then(() => { const ok = recordSent(snap, entry); closeDialog({ value: 'shared' }, true, token); toast(ok ? '傳好了' : '傳出去了，但紀錄沒存到'); })
+            .catch(() => {});
+        };
+      },
       title: '圖片做好了',
       body: (canFile ? `<button class="btn line" id="shareAgain" style="width:100%">再按一次：傳出去</button>` : '') +
         `<div style="font-size:19px;margin:8px 0">${canFile ? '或' : ''}用手指按住圖片不放，選「下載圖片」或「分享」。</div><img src="${url}" style="width:100%;border:2px solid #ddd;border-radius:8px">` +
@@ -764,6 +800,7 @@ async function shareSheet(snap, entry){
     if (!canFile && r.value === 'done') recordSent(snap, entry);
   } finally {
     sharing = false;
+    setBusy(false);
   }
 }
 
@@ -814,13 +851,16 @@ function renderSettings(){
 $('titleSave').addEventListener('click', () => {
   const t = $('titleInput').value.trim();
   if (!t) { toast('名稱不能空白'); return; }
-  S.title = t; save(); toast('名稱存好了');
+  const old = S.title; S.title = t;
+  if (save()) toast('名稱存好了'); else { S.title = old; $('titleInput').value = old; }
 });
 $('nameList').addEventListener('click', async e => {
   const b = e.target.closest('button[data-n]'); if (!b) return;
   const n = b.dataset.n;
   if (!(await ask(`要把「${esc(n)}」從常賣的菜刪掉嗎？`, '刪掉', '不要'))) return;
-  delete S.usage[n]; save(); renderSettings();
+  const u = S.usage[n]; delete S.usage[n];
+  if (!save()) S.usage[n] = u;
+  renderSettings();
 });
 $('backupBtn').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
@@ -839,7 +879,8 @@ $('restoreFile').addEventListener('change', async e => {
     if (!s) throw new Error('bad');
     if (!(await ask('用備份檔還原後，現在手機裡的資料會被換掉。確定嗎？', '還原', '不要'))) return;
     const old = S;
-    try { localStorage.setItem(KEY + '-before-restore', JSON.stringify(old)); } catch (e2) {}
+    try { localStorage.setItem(KEY + '-before-restore', JSON.stringify(old)); }
+    catch (e2) { tell('手機空間不夠，沒辦法先留一份目前的資料，所以<b>沒有還原</b>。'); return; }
     S = s;
     if (save()) toast('還原好了'); else S = old;
     renderSettings();
